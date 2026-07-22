@@ -4,17 +4,5 @@
     "color": "#000000",
     "bgColor": "#ffffff",
     "logo": ""
-  },
-  "posteit": {
-    "url": "https://www.poste.it",
-    "color": "#0047bb",
-    "bgColor": "#eedc00",
-    "logo": "https://play-lh.googleusercontent.com/e7FiUA9hk-TCfBHatu2wt2HbMYsc_daFtFSMCBJfy4GZKo7kr67-cnsth_Forlj3D9mqFY-TvQ_nuu0S83Sx0Q"
-  },
-  "postaliane.it": {
-    "url": "https://www.posteitaliane.it",
-    "color": "#000000",
-    "bgColor": "#ffffff",
-    "logo": ""
   }
 }
