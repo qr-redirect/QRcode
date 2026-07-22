@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code Hub & Admin</title>
+  
+  <!-- Libreria QR Code Styling -->
+  <script type="text/javascript" src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --border-color: #e2e8f0;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+    }
+
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-color); margin: 0; padding: 0; color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    
+    #app-loader { text-align: center; color: var(--text-muted); font-size: 15px; font-weight: 500; }
+
+    .admin-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
+    .admin-container { background: var(--card-bg); width: 100%; max-width: 850px; max-height: 90vh; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; overflow: hidden; }
+    
+    .admin-header { padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: #fff; }
+    .admin-header h2 { margin: 0; font-size: 1.25rem; color: var(--text-main); }
+    
+    .admin-body { padding: 24px; overflow-y: auto; flex: 1; }
+    
+    .toolbar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .search-box { flex: 1; min-width: 200px; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px; outline: none; transition: border 0.2s; }
+    .search-box:focus { border-color: var(--primary); }
+
+    .link-card { background: #fff; border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); transition: all 0.2s; }
+    .link-card:hover { border-color: #cbd5e1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .link-row-main { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    
+    input.input-field { padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 13px; outline: none; }
+    input.input-field:focus { border-color: var(--primary); }
+    input.slug { width: 130px; font-weight: 600; }
+    input.url { flex: 1; min-width: 220px; }
+
+    .link-options-toggle { font-size: 12px; color: var(--primary); background: none; border: none; cursor: pointer; padding: 4px 0; margin-top: 8px; display: inline-block; font-weight: 500; }
+    
+    .qr-custom-drawer { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-color); gap: 15px; align-items: center; flex-wrap: wrap; font-size: 12px; }
+    .color-picker-group { display: flex; align-items: center; gap: 6px; }
+    .color-picker-group input[type="color"] { border: none; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; background: none; }
+
+    .btn { background: var(--primary); color: white; border: none; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+    .btn:hover { background: var(--primary-hover); }
+    .btn-success { background: #10b981; }
+    .btn-success:hover { background: #059669; }
+    .btn-danger { background: #ef4444; padding: 9px 12px; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-sec { background: #64748b; }
+    .btn-sec:hover { background: #475569; }
+
+    .admin-footer { padding: 16px 24px; border-top: 1px solid var(--border-color); background: #f8fafc; display: flex; justify-content: space-between; align-items: center; }
+    
+    .qr-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1100; align-items: center; justify-content: center; }
+    .qr-modal-content { background: #fff; padding: 24px; border-radius: 16px; text-align: center; max-width: 320px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+  </style>
+</head>
+<body>
+
+  <div id="app-loader">Elaborazione in corso...</div>
+
+  <!-- PANNELLO ADMIN PRINCIPALE -->
+  <div id="adminModal" class="admin-overlay">
+    <div class="admin-container">
+      <div class="admin-header">
+        <h2>⚙️ Gestione QR Code & Redirect</h2>
+        <span id="status" style="font-size: 13px; color: var(--text-muted);">Pronto</span>
+      </div>
+
+      <div class="admin-body">
+        <div style="margin-bottom: 20px; background: #f1f5f9; padding: 12px; border-radius: 10px;">
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px; text-transform: uppercase;">GitHub Personal Access Token</label>
+          <input type="password" id="ghToken" class="input-field" placeholder="github_pat_..." style="width: 100%; box-sizing: border-box;">
+        </div>
+
+        <div class="toolbar">
+          <input type="text" id="searchInput" class="search-box" placeholder="🔍 Cerca tra i link..." oninput="filtraLinks()">
+          <button type="button" class="btn btn-success" onclick="aggiungiRiga()">+ Nuovo Link</button>
+        </div>
+
+        <div id="linksContainer"></div>
+      </div>
+
+      <div class="admin-footer">
+        <span style="font-size: 12px; color: var(--text-muted);">Modifiche salvate su GitHub Pages</span>
+        <button type="button" class="btn" onclick="salvaSuGithub()" style="padding: 10px 24px;">💾 Salva Modifiche</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALE ANTEPRIMA & DOWNLOAD QR -->
+  <div id="qrModal" class="qr-modal" onclick="chiudiQRPopup(event)">
+    <div class="qr-modal-content" onclick="event.stopPropagation()">
+      <h3 id="qrModalTitle" style="margin-top: 0; font-size: 16px;">QR Code</h3>
+      <div id="canvasContainer" style="margin: 15px 0;"></div>
+      <div style="display: flex; gap: 8px; justify-content: center;">
+        <button type="button" class="btn btn-success" onclick="scaricaQR('png')">PNG</button>
+        <button type="button" class="btn" onclick="scaricaQR('svg')">SVG</button>
+        <button type="button" class="btn btn-sec" onclick="document.getElementById('qrModal').style.display='none'">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const REPO_OWNER = "fabiusai";
+    const REPO_NAME = "QRcode";
+    const ADMIN_KEY = "segreto123";
+
+    let currentData = {};
+    let fileSha = "";
+    let activeQrStyling = null;
+    let activeSlugForQr = "";
+
+    (async function init() {
+      const fullUrl = window.location.href;
+      const urlParams = new URLSearchParams(window.location.search);
+      const isAdmin = urlParams.get('admin') === ADMIN_KEY || fullUrl.includes('admin=' + ADMIN_KEY);
+
+      if (isAdmin) {
+        document.getElementById('app-loader').style.display = 'none';
+        document.getElementById('adminModal').style.display = 'flex';
+        await caricaDatiAdmin();
+        return;
+      }
+
+      try {
+        const res = await fetch('./redirects.json?v=' + Date.now());
+        if (!res.ok) throw new Error();
+        const redirects = await res.json();
+        
+        let chiave = (urlParams.keys().next().value || urlParams.get('id') || window.location.hash.replace('#', '')).toLowerCase();
+        let target = redirects[chiave] || redirects['default'];
+
+        let destinationUrl = (target && typeof target === 'object') ? target.url : target;
+        
+        if (destinationUrl) {
+          window.location.replace(destinationUrl);
+        } else {
+          document.getElementById('app-loader').innerHTML = `
+            <p>Destinazione non trovata per questo codice.</p>
+            <p style="margin-top: 15px;"><a href="?admin=${ADMIN_KEY}" style="color: #2563eb; text-decoration: none; font-weight: bold;">Accedi al Pannello Admin</a></p>
+          `;
+        }
+      } catch (e) {
+        document.getElementById('app-loader').innerHTML = `
+          <p>Pannello di controllo pronto.</p>
+          <p style="margin-top: 15px;"><a href="?admin=${ADMIN_KEY}" style="background: #2563eb; color: white; padding: 10px 18px; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500; display: inline-block;">Accedi al Pannello Admin</a></p>
+        `;
+      }
+    })();
+
+    async function caricaDatiAdmin() {
+      const token = localStorage.getItem('gh_token') || '';
+      document.getElementById('ghToken').value = token;
+
+      try {
+        const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/redirects.json`, {
+          headers: token ? { 'Authorization': `token ${token}` } : {}
+        });
+        
+        if (!res.ok) {
+          currentData = { "default": { url: "https://google.com", color: "#000000", bgColor: "#ffffff", logo: "" } };
+          renderForm();
+          return;
+        }
+
+        const data = await res.json();
+        fileSha = data.sha;
+        currentData = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+        renderForm();
+        document.getElementById('status').innerText = "✅ Sincronizzato con GitHub";
+      } catch (e) {
+        currentData = { "default": { url: "https://google.com", color: "#000000", bgColor: "#ffffff", logo: "" } };
+        renderForm();
+      }
+    }
+
+    function renderForm(filtro = '') {
+      const container = document.getElementById('linksContainer');
+      container.innerHTML = '';
+
+      for (const [slug, item] of Object.entries(currentData)) {
+        if (filtro && !slug.toLowerCase().includes(filtro.toLowerCase())) continue;
+
+        const urlVal = (item && typeof item === 'object') ? item.url : item;
+        const colorVal = (item && typeof item === 'object' && item.color) ? item.color : '#000000';
+        const bgVal = (item && typeof item === 'object' && item.bgColor) ? item.bgColor : '#ffffff';
+        const logoVal = (item && typeof item === 'object' && item.logo) ? item.logo : '';
+
+        const card = document.createElement('div');
+        card.className = 'link-card';
+        card.innerHTML = `
+          <div class="link-row-main">
+            <input type="text" class="input-field slug" value="${slug}" placeholder="slug">
+            <input type="url" class="input-field url" value="${urlVal}" placeholder="https://destinazione.com">
+            <button type="button" class="btn btn-sec" onclick="apriQRPopup(this)" title="Genera QR">👁️ QR</button>
+            <button type="button" class="btn btn-danger" onclick="rimuoviRiga(this)">✕</button>
+          </div>
+          <button type="button" class="link-options-toggle" onclick="togglePersonalizzazione(this)">🎨 Personalizza colori e logo QR ▼</button>
+          <div class="qr-custom-drawer" style="display: none;">
+            <div class="color-picker-group">
+              <label>Colore QR:</label>
+              <input type="color" class="qr-color" value="${colorVal}">
+            </div>
+            <div class="color-picker-group">
+              <label>Sfondo:</label>
+              <input type="color" class="qr-bg" value="${bgVal}">
+            </div>
+            <input type="text" class="input-field qr-logo" value="${logoVal}" placeholder="Link immagine logo (es: https://sito.com/logo.png)" style="flex:1; font-size:12px;">
+          </div>
+        `;
+        container.appendChild(card);
+      }
+    }
+
+    function togglePersonalizzazione(btn) {
+      const drawer = btn.nextElementSibling;
+      if (drawer.style.display === 'none' || drawer.style.display === '') {
+        drawer.style.display = 'flex';
+        btn.innerText = '🎨 Nascondi personalizzazione ▲';
+      } else {
+        drawer.style.display = 'none';
+        btn.innerText = '🎨 Personalizza colori e logo QR ▼';
+      }
+    }
+
+    function filtraLinks() {
+      const query = document.getElementById('searchInput').value;
+      renderForm(query);
+    }
+
+    function aggiungiRiga() {
+      const container = document.getElementById('linksContainer');
+      const card = document.createElement('div');
+      card.className = 'link-card';
+      card.innerHTML = `
+        <div class="link-row-main">
+          <input type="text" class="input-field slug" value="" placeholder="nuovo-slug">
+          <input type="url" class="input-field url" value="" placeholder="https://...">
+          <button type="button" class="btn btn-sec" onclick="apriQRPopup(this)">👁️ QR</button>
+          <button type="button" class="btn btn-danger" onclick="rimuoviRiga(this)">✕</button>
+        </div>
+        <button type="button" class="link-options-toggle" onclick="togglePersonalizzazione(this)">🎨 Personalizza colori e logo QR ▼</button>
+        <div class="qr-custom-drawer" style="display: none;">
+          <div class="color-picker-group"><label>Colore QR:</label><input type="color" class="qr-color" value="#000000"></div>
+          <div class="color-picker-group"><label>Sfondo:</label><input type="color" class="qr-bg" value="#ffffff"></div>
+          <input type="text" class="input-field qr-logo" value="" placeholder="Link immagine logo (es: https://sito.com/logo.png)" style="flex:1; font-size:12px;">
+        </div>
+      `;
+      container.prepend(card);
+    }
+
+    function rimuoviRiga(btn) {
+      btn.closest('.link-card').remove();
+    }
+
+    function apriQRPopup(btn) {
+      const card = btn.closest('.link-card');
+      const currentSlug = card.querySelector('.slug').value.trim().toLowerCase();
+      const color = card.querySelector('.qr-color').value;
+      const bgColor = card.querySelector('.qr-bg').value;
+      const logoUrl = card.querySelector('.qr-logo').value.trim();
+
+      if (!currentSlug) {
+        alert("Inserisci prima uno slug valido!");
+        return;
+      }
+
+      activeSlugForQr = currentSlug;
+      const targetUrl = window.location.origin + window.location.pathname + '?' + currentSlug;
+
+      document.getElementById('qrModalTitle').innerText = `QR: ?${currentSlug}`;
+      document.getElementById('canvasContainer').innerHTML = '';
+
+      activeQrStyling = new QRCodeStyling({
+        width: 240,
+        height: 240,
+        type: "canvas",
+        data: targetUrl,
+        image: logoUrl || undefined,
+        imageOptions: { crossOrigin: "anonymous", margin: 4, imageSize: 0.3 },
+        dotsOptions: { color: color, type: "rounded" },
+        backgroundOptions: { color: bgColor },
+        qrOptions: { errorCorrectionLevel: "H" }
+      });
+
+      activeQrStyling.append(document.getElementById('canvasContainer'));
+      document.getElementById('qrModal').style.display = 'flex';
+    }
+
+    function chiudiQRPopup(e) {
+      document.getElementById('qrModal').style.display = 'none';
+    }
+
+    function scaricaQR(format) {
+      if (!activeQrStyling) return;
+      activeQrStyling.download({ name: `qrcode-${activeSlugForQr}`, extension: format });
+    }
+
+    async function salvaSuGithub() {
+      const token = document.getElementById('ghToken').value.trim();
+      if (!token) return alert("Inserisci il Token GitHub!");
+      
+      localStorage.setItem('gh_token', token);
+      document.getElementById('status').innerText = "Salvataggio in corso...";
+
+      const nuoviRedirects = {};
+      document.querySelectorAll('.link-card').forEach(card => {
+        const slug = card.querySelector('.slug').value.trim().toLowerCase();
+        const url = card.querySelector('.url').value.trim();
+        const color = card.querySelector('.qr-color').value;
+        const bgColor = card.querySelector('.qr-bg').value;
+        const logo = card.querySelector('.qr-logo').value.trim();
+
+        if (slug && url) {
+          nuoviRedirects[slug] = { url, color, bgColor, logo };
+        }
+      });
+
+      const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(nuoviRedirects, null, 2))));
+      const payload = { message: "Aggiornamento avanzato reindirizzamenti e stili QR", content: contentEncoded };
+      if (fileSha) payload.sha = fileSha;
+
+      try {
+        const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/redirects.json`, {
+          method: 'PUT',
+          headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          fileSha = data.content.sha;
+          document.getElementById('status').innerText = "✅ Salvato con successo!";
+        } else {
+          document.getElementById('status').innerText = "❌ Errore di salvataggio (Token non valido?)";
+        }
+      } catch (e) {
+        document.getElementById('status').innerText = "❌ Errore di rete.";
+      }
+    }
+  </script>
+</body>
+</html>
