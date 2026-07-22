@@ -67,7 +67,7 @@
 </head>
 <body>
 
-  <!-- CONTENITORE MESSAGGI / SCHERMATA PRINCIPALE -->
+  <!-- CONTENITORE PRINCIPALE / STATUS -->
   <div id="app-loader">Elaborazione in corso...</div>
 
   <!-- PANNELLO ADMIN PRINCIPALE -->
@@ -113,7 +113,7 @@
   </div>
 
   <script>
-    // PARAMETRI ORGANIZZAZIONE
+    // PARAMETRI REPOSITORY
     const REPO_OWNER = "qr-redirect";
     const REPO_NAME = "QRcode";
     const ADMIN_KEY = "segreto123";
@@ -122,6 +122,23 @@
     let fileSha = "";
     let activeQrStyling = null;
     let activeSlugForQr = "";
+
+    function mostraSchermataHome(messaggio) {
+      document.getElementById('app-loader').innerHTML = `
+        <div style="background: white; padding: 32px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); max-width: 420px; margin: 40px auto; border: 1px solid #e2e8f0; text-align: center;">
+          <h3 style="margin-top: 0; color: #1e293b; font-size: 1.25rem;">⚡ QR Code Hub</h3>
+          <p style="color: #64748b; font-size: 14px; line-height: 1.5; margin-bottom: 24px;">
+            ${messaggio}
+          </p>
+          <a href="?admin=${ADMIN_KEY}" style="background: #2563eb; color: white; padding: 12px 20px; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; display: inline-block; transition: background 0.2s;">
+            ⚙️ Accedi al Pannello Admin
+          </a>
+          <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #f1f5f9; font-size: 11px; color: #10b981; font-weight: 700;">
+            ✅ Versione v2.5 (Zero-Default-Redirect)
+          </div>
+        </div>
+      `;
+    }
 
     (async function init() {
       const fullUrl = window.location.href;
@@ -136,51 +153,33 @@
         return;
       }
 
-      // 2. SCUDO ANTI-RIMBALZO (Se apri il sito senza specificare un codice QR, ti mostra il tasto Admin)
+      // 2. CONTROLLO PRESENZA PARAMETRI (Se non c'è nessun codice nell'URL, si ferma qui)
       const hasParams = urlParams.toString().length > 0 || window.location.hash.length > 1;
       if (!hasParams) {
-        document.getElementById('app-loader').innerHTML = `
-          <div style="background: white; padding: 32px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); max-width: 420px; margin: 40px auto; border: 1px solid #e2e8f0;">
-            <h3 style="margin-top: 0; color: #1e293b; font-size: 1.25rem;">⚡ QR Code Hub</h3>
-            <p style="color: #64748b; font-size: 14px; line-height: 1.5; margin-bottom: 24px;">
-              Sei nella pagina principale del gestore di reindirizzamenti dell'organizzazione <b>qr-redirect</b>. Nessun codice QR è stato specificato nell'indirizzo.
-            </p>
-            <a href="?admin=${ADMIN_KEY}" style="background: #2563eb; color: white; padding: 12px 20px; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; display: inline-block; transition: background 0.2s;">
-              ⚙️ Accedi al Pannello Admin
-            </a>
-          </div>
-        `;
+        mostraSchermataHome("Sei nella pagina principale. Nessun codice di reindirizzamento è stato specificato nell'URL.");
         return;
       }
 
-      // 3. REINDIRIZZAMENTO NORMALE PER I QR CODE
+      // 3. REINDIRIZZAMENTO ESCLUSIVO (Senza alcun default su Google)
       try {
         const res = await fetch('./redirects.json?v=' + Date.now());
         if (!res.ok) throw new Error();
         const redirects = await res.json();
         
         let chiave = (urlParams.keys().next().value || urlParams.get('id') || window.location.hash.replace('#', '')).toLowerCase();
-        let target = redirects[chiave] || redirects['default'];
-
+        
+        // Cerca ESCLUSIVAMENTE la chiave richiesta. Nessun fallback!
+        let target = redirects[chiave];
         let destinationUrl = (target && typeof target === 'object') ? target.url : target;
         
-        if (destinationUrl) {
+        // Ignora qualsiasi eventuale vecchia regola "default" rimasta nel JSON
+        if (destinationUrl && chiave !== 'default') {
           window.location.replace(destinationUrl);
         } else {
-          document.getElementById('app-loader').innerHTML = `
-            <div style="background: white; padding: 30px; border-radius: 12px; max-width: 400px; margin: 40px auto; text-align: center; border: 1px solid #e2e8f0;">
-              <p style="color: #ef4444; font-weight: 600;">Destinazione non trovata per questo codice.</p>
-              <p style="margin-top: 20px;"><a href="?admin=${ADMIN_KEY}" style="color: #2563eb; text-decoration: none; font-weight: 600;">Accedi al Pannello Admin</a></p>
-            </div>
-          `;
+          mostraSchermataHome(`Il codice "<b>?${chiave}</b>" non è associato a nessuna destinazione attiva.`);
         }
       } catch (e) {
-        document.getElementById('app-loader').innerHTML = `
-          <div style="background: white; padding: 30px; border-radius: 12px; max-width: 400px; margin: 40px auto; text-align: center; border: 1px solid #e2e8f0;">
-            <p style="color: #64748b;">Pannello di controllo pronto.</p>
-            <p style="margin-top: 20px;"><a href="?admin=${ADMIN_KEY}" style="background: #2563eb; color: white; padding: 10px 18px; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500; display: inline-block;">Accedi al Pannello Admin</a></p>
-          </div>
-        `;
+        mostraSchermataHome("Impossibile caricare il database dei link in questo momento.");
       }
     })();
 
@@ -194,7 +193,7 @@
         });
         
         if (!res.ok) {
-          currentData = { "default": { url: "https://google.com", color: "#000000", bgColor: "#ffffff", logo: "" } };
+          currentData = {};
           renderForm();
           return;
         }
@@ -202,10 +201,14 @@
         const data = await res.json();
         fileSha = data.sha;
         currentData = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+        
+        // Rimuove visivamente eventuale vecchia voce "default" se presente nel JSON
+        delete currentData['default'];
+        
         renderForm();
         document.getElementById('status').innerText = "✅ Sincronizzato con GitHub";
       } catch (e) {
-        currentData = { "default": { url: "https://google.com", color: "#000000", bgColor: "#ffffff", logo: "" } };
+        currentData = {};
         renderForm();
       }
     }
@@ -216,6 +219,7 @@
 
       for (const [slug, item] of Object.entries(currentData)) {
         if (filtro && !slug.toLowerCase().includes(filtro.toLowerCase())) continue;
+        if (slug === 'default') continue; // Salta il rendering del default
 
         const urlVal = (item && typeof item === 'object') ? item.url : item;
         const colorVal = (item && typeof item === 'object' && item.color) ? item.color : '#000000';
@@ -347,7 +351,7 @@
         const bgColor = card.querySelector('.qr-bg').value;
         const logo = card.querySelector('.qr-logo').value.trim();
 
-        if (slug && url) {
+        if (slug && url && slug !== 'default') {
           nuoviRedirects[slug] = { url, color, bgColor, logo };
         }
       });
