@@ -134,7 +134,7 @@
             ⚙️ Accedi al Pannello Admin
           </a>
           <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #f1f5f9; font-size: 11px; color: #10b981; font-weight: 700;">
-            ✅ Versione v2.5 (Zero-Default-Redirect)
+            ✅ Versione v2.6 (Smart-Admin-Recognition)
           </div>
         </div>
       `;
@@ -143,12 +143,23 @@
     (async function init() {
       const fullUrl = window.location.href;
       const urlParams = new URLSearchParams(window.location.search);
+      const firstParamKey = urlParams.keys().next().value || '';
       
-      // 1. CONTROLLO ADMIN IMMEDIATO
-      const isAdmin = urlParams.get('admin') === ADMIN_KEY || fullUrl.includes('admin=' + ADMIN_KEY);
+      // 1. CONTROLLO ADMIN ESTESO (Riconosce 'admin' in qualsiasi forma, anche se ci incolli il token GitHub!)
+      const isAdmin = urlParams.has('admin') || 
+                      firstParamKey.toLowerCase() === 'admin' || 
+                      fullUrl.toLowerCase().includes('admin');
+
       if (isAdmin) {
         document.getElementById('app-loader').style.display = 'none';
         document.getElementById('adminModal').style.display = 'flex';
+        
+        // Se hai incollato il token di GitHub nell'URL (?admin=github_pat_...), lo salva automaticamente!
+        const adminVal = urlParams.get('admin') || '';
+        if (adminVal.startsWith('github_pat_') || adminVal.startsWith('ghp_')) {
+          localStorage.setItem('gh_token', adminVal);
+        }
+        
         await caricaDatiAdmin();
         return;
       }
@@ -160,7 +171,7 @@
         return;
       }
 
-      // 3. REINDIRIZZAMENTO ESCLUSIVO (Senza alcun default su Google)
+      // 3. REINDIRIZZAMENTO ESCLUSIVO PER I QR CODE
       try {
         const res = await fetch('./redirects.json?v=' + Date.now());
         if (!res.ok) throw new Error();
@@ -168,11 +179,9 @@
         
         let chiave = (urlParams.keys().next().value || urlParams.get('id') || window.location.hash.replace('#', '')).toLowerCase();
         
-        // Cerca ESCLUSIVAMENTE la chiave richiesta. Nessun fallback!
         let target = redirects[chiave];
         let destinationUrl = (target && typeof target === 'object') ? target.url : target;
         
-        // Ignora qualsiasi eventuale vecchia regola "default" rimasta nel JSON
         if (destinationUrl && chiave !== 'default') {
           window.location.replace(destinationUrl);
         } else {
@@ -201,10 +210,7 @@
         const data = await res.json();
         fileSha = data.sha;
         currentData = JSON.parse(decodeURIComponent(escape(atob(data.content))));
-        
-        // Rimuove visivamente eventuale vecchia voce "default" se presente nel JSON
         delete currentData['default'];
-        
         renderForm();
         document.getElementById('status').innerText = "✅ Sincronizzato con GitHub";
       } catch (e) {
@@ -219,7 +225,7 @@
 
       for (const [slug, item] of Object.entries(currentData)) {
         if (filtro && !slug.toLowerCase().includes(filtro.toLowerCase())) continue;
-        if (slug === 'default') continue; // Salta il rendering del default
+        if (slug === 'default') continue;
 
         const urlVal = (item && typeof item === 'object') ? item.url : item;
         const colorVal = (item && typeof item === 'object' && item.color) ? item.color : '#000000';
