@@ -21,7 +21,7 @@
 
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-color); margin: 0; padding: 0; color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; }
     
-    #app-loader { text-align: center; color: var(--text-muted); font-size: 15px; font-weight: 500; }
+    #app-loader { text-align: center; color: var(--text-muted); font-size: 15px; font-weight: 500; padding: 20px; width: 100%; box-sizing: border-box; }
 
     .admin-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 1000; padding: 20px; box-sizing: border-box; }
     .admin-container { background: var(--card-bg); width: 100%; max-width: 850px; max-height: 90vh; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; overflow: hidden; }
@@ -67,6 +67,7 @@
 </head>
 <body>
 
+  <!-- CONTENITORE MESSAGGI / SCHERMATA PRINCIPALE -->
   <div id="app-loader">Elaborazione in corso...</div>
 
   <!-- PANNELLO ADMIN PRINCIPALE -->
@@ -92,7 +93,7 @@
       </div>
 
       <div class="admin-footer">
-        <span style="font-size: 12px; color: var(--text-muted);">Modifiche salvate su GitHub Pages</span>
+        <span style="font-size: 12px; color: var(--text-muted);">Organizzazione: qr-redirect</span>
         <button type="button" class="btn" onclick="salvaSuGithub()" style="padding: 10px 24px;">💾 Salva Modifiche</button>
       </div>
     </div>
@@ -112,6 +113,7 @@
   </div>
 
   <script>
+    // PARAMETRI ORGANIZZAZIONE
     const REPO_OWNER = "qr-redirect";
     const REPO_NAME = "QRcode";
     const ADMIN_KEY = "segreto123";
@@ -124,8 +126,9 @@
     (async function init() {
       const fullUrl = window.location.href;
       const urlParams = new URLSearchParams(window.location.search);
+      
+      // 1. CONTROLLO ADMIN IMMEDIATO
       const isAdmin = urlParams.get('admin') === ADMIN_KEY || fullUrl.includes('admin=' + ADMIN_KEY);
-
       if (isAdmin) {
         document.getElementById('app-loader').style.display = 'none';
         document.getElementById('adminModal').style.display = 'flex';
@@ -133,6 +136,24 @@
         return;
       }
 
+      // 2. SCUDO ANTI-RIMBALZO (Se apri il sito senza specificare un codice QR, ti mostra il tasto Admin)
+      const hasParams = urlParams.toString().length > 0 || window.location.hash.length > 1;
+      if (!hasParams) {
+        document.getElementById('app-loader').innerHTML = `
+          <div style="background: white; padding: 32px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); max-width: 420px; margin: 40px auto; border: 1px solid #e2e8f0;">
+            <h3 style="margin-top: 0; color: #1e293b; font-size: 1.25rem;">⚡ QR Code Hub</h3>
+            <p style="color: #64748b; font-size: 14px; line-height: 1.5; margin-bottom: 24px;">
+              Sei nella pagina principale del gestore di reindirizzamenti dell'organizzazione <b>qr-redirect</b>. Nessun codice QR è stato specificato nell'indirizzo.
+            </p>
+            <a href="?admin=${ADMIN_KEY}" style="background: #2563eb; color: white; padding: 12px 20px; text-decoration: none; border-radius: 8px; font-weight: 500; font-size: 14px; display: inline-block; transition: background 0.2s;">
+              ⚙️ Accedi al Pannello Admin
+            </a>
+          </div>
+        `;
+        return;
+      }
+
+      // 3. REINDIRIZZAMENTO NORMALE PER I QR CODE
       try {
         const res = await fetch('./redirects.json?v=' + Date.now());
         if (!res.ok) throw new Error();
@@ -147,14 +168,18 @@
           window.location.replace(destinationUrl);
         } else {
           document.getElementById('app-loader').innerHTML = `
-            <p>Destinazione non trovata per questo codice.</p>
-            <p style="margin-top: 15px;"><a href="?admin=${ADMIN_KEY}" style="color: #2563eb; text-decoration: none; font-weight: bold;">Accedi al Pannello Admin</a></p>
+            <div style="background: white; padding: 30px; border-radius: 12px; max-width: 400px; margin: 40px auto; text-align: center; border: 1px solid #e2e8f0;">
+              <p style="color: #ef4444; font-weight: 600;">Destinazione non trovata per questo codice.</p>
+              <p style="margin-top: 20px;"><a href="?admin=${ADMIN_KEY}" style="color: #2563eb; text-decoration: none; font-weight: 600;">Accedi al Pannello Admin</a></p>
+            </div>
           `;
         }
       } catch (e) {
         document.getElementById('app-loader').innerHTML = `
-          <p>Pannello di controllo pronto.</p>
-          <p style="margin-top: 15px;"><a href="?admin=${ADMIN_KEY}" style="background: #2563eb; color: white; padding: 10px 18px; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500; display: inline-block;">Accedi al Pannello Admin</a></p>
+          <div style="background: white; padding: 30px; border-radius: 12px; max-width: 400px; margin: 40px auto; text-align: center; border: 1px solid #e2e8f0;">
+            <p style="color: #64748b;">Pannello di controllo pronto.</p>
+            <p style="margin-top: 20px;"><a href="?admin=${ADMIN_KEY}" style="background: #2563eb; color: white; padding: 10px 18px; text-decoration: none; border-radius: 8px; font-size: 14px; font-weight: 500; display: inline-block;">Accedi al Pannello Admin</a></p>
+          </div>
         `;
       }
     })();
